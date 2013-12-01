@@ -26,9 +26,9 @@ public class Environment extends Component {
 	public Double eLSpeed = 0.0;
 	public Double eFFPos = 0.0;
 	public Double eFFSpeed = 0.0; 
-	public Double eHPos = 700.0;
+	public Double eHPos = 500.0;
 	public Double eHSpeed = 0.0; 
-	public Double eH2Pos = 1400.0;
+	public Double eH2Pos = 1000.0;
 	public Double eH2Speed = 0.0; 
 	public Double eLastTime = 0.0;
 
@@ -86,9 +86,9 @@ public class Environment extends Component {
 		eH2Speed.value += h2Acceleration * timePeriodInSeconds; 
 		eH2Pos.value += eH2Speed.value * timePeriodInSeconds;
 		//--------------------------------------------------------------------------------------------------------
-		 		
+		 	
 		eLastTime.value = currentTime;
-//		System.out.println("=================================== full statue ==========================================");
+//		System.out.println("=================================== statue ==========================================");
 //		System.out.println("Speed leader : "+eLSpeed.value+", pos : "+eLPos.value+"... time :"+currentTime);
 // 		System.out.println("Speed FireFighter : "+eFFSpeed.value+", pos : "+eFFPos.value+"... time :"+currentTime);
 // 		System.out.println("Speed OffloadHelicopter : "+eHSpeed.value+", pos : "+eHPos.value+"... time :"+currentTime);

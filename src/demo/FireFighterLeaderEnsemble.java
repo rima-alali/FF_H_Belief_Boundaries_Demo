@@ -34,6 +34,7 @@ public class FireFighterLeaderEnsemble extends Ensemble {
 			n++;
 			return true;
 		}
+		
 		return false;
 	}
 	

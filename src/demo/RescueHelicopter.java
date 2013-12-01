@@ -15,6 +15,7 @@ import cz.cuni.mff.d3s.deeco.annotations.Process;
 import cz.cuni.mff.d3s.deeco.knowledge.Component;
 import cz.cuni.mff.d3s.deeco.knowledge.OutWrapper;
 
+
 public class RescueHelicopter extends Component {
 
 	public String hName;
@@ -22,26 +23,30 @@ public class RescueHelicopter extends Component {
 	public Double hSpeed = 0.0;
 	public Double hGas = 0.0;
 	public Double hBrake = 0.0;
+	public Double hCreationTime = 0.0;
 	public Double hRangeDistance = 100.0; // sensors or camera range  
-
+	public Boolean hMove = false;
 	public Boolean hMoveByOrder = false;
- 	
+
 	public Double hFFPos = 0.0;
 	public Double hFFSpeed = 0.0;
 	public Double hFFCreationTime = 0.0;
+	public Boolean hFFLost = false;
 	public Boolean hFFConnected = false;
 	
 	public Double hFFTargetPos = 0.0;
 	public Double hFFTargetSpeed = 0.0;
  
-	protected static double hLastTime = 0.0;
 	protected static double hFFPosMin = 0.0;
 	protected static double hFFSpeedMin = 0.0;
 	protected static double hFFPosMax = 0.0;
 	protected static double hFFSpeedMax = 0.0;
+
 	protected static double hPosTarget = 0.0;
 	protected static double hSpeedTarget = 0.0;
 
+	protected static double hInit = 0.0;
+	protected static double hLastTime = 0.0;
 	protected static double hIntegratorError = 0.0;
 	protected static double hErrorWindup = 0.0;
 
@@ -53,7 +58,7 @@ public class RescueHelicopter extends Component {
 	protected static final double TIMEPERIOD = 100;
 	protected static final double SEC_MILISEC_FACTOR = 1000;
 	protected static final double DESIRED_DISTANCE = 0;
-	protected static final double DESIRED_SPEED = 0;
+	protected static final double DESIRED_SPEED = 10;
 	protected static final double SPEED_UPPER_LIMIT = 200;
 	protected static final double THRESHOLD = 200;
 
@@ -75,8 +80,10 @@ public class RescueHelicopter extends Component {
 			@Out("hGas") OutWrapper<Double> hGas,
 			@Out("hBrake") OutWrapper<Double> hBrake,
 
+			@InOut("hMove") OutWrapper<Boolean> hMove,
 			@InOut("hMoveByOrder") OutWrapper<Boolean> hMoveByOrder,
  			@InOut("hFFConnected") OutWrapper<Boolean> hFFConnected,
+ 			@InOut("hFFLost") OutWrapper<Boolean> hFFLost,
 
 			@InOut("hFFTargetPos") OutWrapper<Double> hFFTargetPos,
 			@InOut("hFFTargetSpeed") OutWrapper<Double> hFFTargetSpeed
@@ -86,43 +93,51 @@ public class RescueHelicopter extends Component {
 		System.out.println(" - RescueHelicopter : pos "+hPos+", speed "+hSpeed+"...In the RescueHelicopter : - firefighter : pos "+hFFPos+" ,  speed "+hFFSpeed+" , creation time "+hFFCreationTime);
 		if(hFFCreationTime != 0.0){
 			double inaccuracy = -1;
-			computeBeliefBoundaries(hFFPos, hFFSpeed, hFFTargetPos.value, hFFCreationTime );
+			computeBeliefBoundaries(hFFPos, hFFSpeed, hFFTargetPos.value, hFFCreationTime);
 		
 			if (hFFTargetPos.value != 0.0)
-				inaccuracy = Math.max( Math.abs(hFFPos - hFFPosMin), Math.abs(hFFPosMax - hFFPos)); 
-
-			if (inaccuracy <= THRESHOLD) {
- 				hFFTargetPos.value = hPos;
-				hFFTargetSpeed.value = hSpeed;
-				hMoveByOrder.value = false;
- 			} else if(inaccuracy > THRESHOLD) {
-				hMoveByOrder.value = true;
-				hFFConnected.value = false;
-			}
+				inaccuracy = Math.max( Math.abs(hFFPos  - hFFPosMin), Math.abs(hFFPosMax - hFFPos)); 
 			
-			if(!hFFConnected.value){
-				if(hMoveByOrder.value){
+			if (inaccuracy <= THRESHOLD ) {
+				hMove.value = false;
+				hFFLost.value = false;
+			} else 
+			if(inaccuracy > THRESHOLD) {
+				hFFConnected.value = false;
+				hMove.value = true;
+				hFFLost.value = true;
+			}
+			if(!hFFConnected.value && inaccuracy >= 0 && hFFLost.value){
+				if(hMoveByOrder.value || hMove.value){
 					if(hFFPosMin > hPos){
 						hFFTargetPos.value = hFFPosMax;
 						hFFTargetSpeed.value = hFFSpeedMax;
 					}else if(hPos > hFFPosMax){
-						hFFTargetPos.value = hFFPosMin;
-						hFFTargetSpeed.value = hFFSpeedMin;
-					}  else {									
-						hFFTargetPos.value = hFFPosMin;			
-						hFFTargetSpeed.value = hFFSpeedMin;		
+						hFFTargetPos.value = hPos;
+						hFFTargetSpeed.value = DESIRED_SPEED;
+					} else {			
+						hFFTargetPos.value = hFFPosMax;			
+						hFFTargetSpeed.value = hFFSpeedMax;	
 					}											
-					System.err.println("H2 Move .....  from : "+hPos+"  to "+hFFTargetPos.value+"  .  Min:"+hFFPosMin+"   Max:"+hFFPosMax);
-				} else {
- 					hFFTargetPos.value = hPos; 
-					hFFTargetSpeed.value = hSpeed;
+					System.err.println("H2_Move.....  from : "+hPos+"  to "+hFFTargetPos.value+",   Min pos: "+hFFPosMin+"  Max pos:"+hFFPosMax);
+				}else if(!hMove.value){
+					hFFTargetPos.value = hPos; 
+					hFFTargetSpeed.value = DESIRED_SPEED;
+					System.err.println("H2_%%%%%%%%%%     OffloadHelicopter moves toward FireFighter   %%%%%%%%%%%%");
+				}else if(!hMove.value){
+					hFFTargetPos.value = hPos; 
+					hFFTargetSpeed.value = DESIRED_SPEED;
+					System.err.println("H2_OffloadHelicopter order RescueHelicopter to move ......");
 				}
+			}else{
+				hFFTargetPos.value = hPos; 
+				hFFTargetSpeed.value = DESIRED_SPEED;
 			}
-		} else {
-			hFFTargetPos.value = hPos;
-			hFFTargetSpeed.value = hSpeed;
+		}else{
+			hFFTargetPos.value = hPos; 
+			hFFTargetSpeed.value = DESIRED_SPEED;
 		}
-		
+
 		Pedal p = speedControl(hPos, hSpeed, hFFTargetPos.value, hFFTargetSpeed.value);
 		hGas.value = p.gas;
 		hBrake.value = p.brake;
@@ -143,14 +158,13 @@ public class RescueHelicopter extends Component {
 					* timePeriodInSeconds;
 			double pidSpeed = KP_S * error + hIntegratorError;
 			hErrorWindup = saturate(pidSpeed) - pidSpeed;
-
+		
 			if (pidSpeed >= 0) {
 				result = new Pedal(pidSpeed, 0.0);
 			} else {
 				result = new Pedal(0.0, -pidSpeed);
 			}
 		}
-		
 		return result;
 	}
 
@@ -161,19 +175,26 @@ public class RescueHelicopter extends Component {
 		double[] minBoundaries = new double[1];
 		double[] maxBoundaries = new double[1];
 		double startTime = 0.0;
-
+		
 		if(hfFFTargetPos != 0.0 ) {
-
-			if (hFFCreationTime <= hLastTime) {
-				startTime = hLastTime;
-			} else {
+			if(hFFCreationTime > hInit){
 				startTime = hFFCreationTime;
 				hFFPosMin = hFFPos;
 				hFFPosMax = hFFPos;
 				hFFSpeedMin = hFFSpeed;
 				hFFSpeedMax = hFFSpeed;
+			}else {
+				if (hFFCreationTime <= hLastTime) {
+					startTime = hLastTime;
+				} else if(hFFCreationTime > hLastTime){
+					startTime = hFFCreationTime;
+					hFFPosMin = hFFPos;
+					hFFPosMax = hFFPos;
+					hFFSpeedMin = hFFSpeed;
+					hFFSpeedMax = hFFSpeed;
+				}
 			}
-
+			
 			// ---------------------- knowledge evaluation --------------------------------
 
 			double accMin = Database.getAcceleration(hFFSpeedMin,
@@ -200,11 +221,16 @@ public class RescueHelicopter extends Component {
 			hFFSpeedMax += maxBoundaries[0];
 			integrator.integrate(f, startTime, maxBoundaries, currentTime, maxBoundaries);
 			hFFPosMax += maxBoundaries[0];
+
 		}
+		if(hFFSpeedMax > 200 ) hFFSpeedMax = 200.0;
+		if(hFFSpeedMin < 0.0) hFFSpeedMin = 0.0;
+		if(hFFPosMin < 0.0) hFFPosMin = 0.0;
 		hLastTime = currentTime;
+		hInit = hFFCreationTime;
 	}
 
-	
+
 	private static double saturate(double val) {
 		if (val > 1)
 			val = 1;
@@ -241,6 +267,7 @@ public class RescueHelicopter extends Component {
 			this.brake = brake;
 		}	
 	}
+
 	
 	private static void target(double hPos) {
 		

@@ -27,13 +27,15 @@ public class FireFighterHelicopterEnsemble extends Ensemble {
 		double currentTime = (double) System.nanoTime() / 1000000000;
 		double dist = (Math.abs(hPos - ffPos));
 		boolean conn = hFFConnected == null ? false : hFFConnected;
+		double vffLastCommunication = ffLastCommunication == null ? 0.0 : ffLastCommunication;
 
-		if (dist < 2 * hRangeDistance && (currentTime - ffLastCommunication) > 1 && ffLastCommunication != 0.0 && !conn && hFFPos < 800) {
-			System.err.println("###delay :" + (currentTime - ffLastCommunication)
-					+ "  helicopter at pos: " + hPos + "  try to connect firefighter pos: "+ffPos
-					+"  . current time = "+ currentTime + "     ffLastCommunication : "+ ffLastCommunication);
+		//											delay 						---------							    the ranges of communication with two helicopters
+		if (dist < 2*hRangeDistance && (currentTime - vffLastCommunication) > 1 && vffLastCommunication != 0.0 && !conn && (ffPos < 1000 ||(ffPos > 1100 && ffPos < 1600))) {
+			System.err.println("###delay :" + (currentTime - vffLastCommunication)
+					+ "  helicopter at pos: " + hPos + "  was asked to connect firefighter pos: "+ffPos+" and its belief is :"+hFFPos
+					+"  . current time = "+ currentTime + "     ffLastCommunication : "+ vffLastCommunication);
 			return true;
-		} else if (conn && hFFPos < 1000){
+		} else if (dist < 2*hRangeDistance && conn && (ffPos < 1000 ||(ffPos > 1100 && ffPos < 1600))){
 			System.err.println("Helicopter at Pos : "+hPos+" connected to firefighter :"+ffPos);
 			return true;
 		}
@@ -60,5 +62,6 @@ public class FireFighterHelicopterEnsemble extends Ensemble {
 		hFFCreationTime.value = ffCreationTime;
 		hFFConnected.value = true;
 		ffLastCommunication.value = ffCreationTime;
+		
 	}
 }

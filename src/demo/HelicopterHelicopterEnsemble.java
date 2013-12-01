@@ -24,21 +24,26 @@ public class HelicopterHelicopterEnsemble extends Ensemble {
 			@In("coord.hFFPos") Double hFFPos,
 			@In("coord.hFFSpeed") Double hFFSpeed,
 			@In("coord.hFFCreationTime") Double hFFCreationTime,
+			@In("coord.hFFLost") Boolean hFFLost,
 			@In("coord.hHPos") Double hHPos,
 			@In("coord.hHSpeed") Double hHSpeed,
-			
+			@In("coord.hHConnected") Boolean hHConnected,
+					
 			@In("member.hPos") Double mHPos,
 			@In("member.hSpeed") Double mHSpeed,
+			@In("member.hCreationTime") Double hCreationTime,
 			@In("member.hMoveByOrder") Boolean mHMoveByOrder,
-			@In("coord.hFFConnected") Boolean mHFFConnected,
+			@In("member.hFFConnected") Boolean mHFFConnected,
 			@In("member.hFFPos") Double mHFFPos,
 			@In("member.hFFSpeed") Double mHFFSpeed,
 			@In("member.hFFCreationTime") Double mHFFCreationTime
  
 			){
 
-		double mcreation = mHFFCreationTime == null ? 0.0 : mHFFCreationTime;
-		if( !hFFConnected && (hFFCreationTime < mcreation) )
+		boolean h1_conn = hFFConnected == null ? false : hFFConnected;
+		double h1_ff_pos = hFFPos == null ? -1.0 : hFFPos;
+
+		if( !h1_conn && h1_ff_pos > 0.0 && hFFLost)
 			return true;
 		
 		return false;
@@ -54,37 +59,51 @@ public class HelicopterHelicopterEnsemble extends Ensemble {
 			@Out("coord.hOrder") OutWrapper<Boolean> hOrder,
 			@Out("coord.hHPos") OutWrapper<Double> hHPos,
 			@Out("coord.hHSpeed") OutWrapper<Double> hHSpeed,
-			
+			@Out("coord.hHConnected") OutWrapper<Boolean> hHConnected,
+			@Out("coord.hHCreationTime") OutWrapper<Double> hHCreationTime,
+					
 			@In("member.hPos") Double mHPos,
 			@In("member.hSpeed") Double mHSpeed,
+			@In("member.hCreationTime") Double mHCreationTime,
 			@In("member.hFFConnected") Boolean mHFFConnected,
 			@Out("member.hMoveByOrder") OutWrapper<Boolean> mHMoveByOrder,
 			@Out("member.hFFPos") OutWrapper<Double> mHFFPos,
 			@Out("member.hFFSpeed") OutWrapper<Double> mHFFSpeed,
 			@Out("member.hFFCreationTime") OutWrapper<Double> mHFFCreationTime
 	) {
-		
-	if( hMove && mHFFConnected){
+	boolean mHFFConn = mHFFConnected == null ? false : mHFFConnected;
+	mHFFPos.value = 0.0;
+	mHFFSpeed.value = 0.0;
+	mHFFCreationTime.value = 0.0;
+	hHPos.value = 0.0;
+	hHSpeed.value = 0.0;
+	hHCreationTime.value = 0.0;
+	hHConnected.value = true;
+
+	if( hMove && mHFFConn){
 		System.err.println("OffloadHelicopter contact RescueHelicopter......");
 		hOrder.value = true;
 		mHMoveByOrder.value = false;
-	}else if( hMove && !mHFFConnected){
-		System.err.println("OffloadHelicopter contact RescueHelicopter......");
-		hOrder.value = true;
-		mHMoveByOrder.value = true;
-	} else 	if( !hMove && mHFFConnected){
+	}else if( hMove && !mHFFConn){
+		System.err.println("OffloadHelicopter moves ......");
 		hOrder.value = false;
 		mHMoveByOrder.value = false;
-	}else if( !hMove && !mHFFConnected){
-		System.err.println("OffloadHelicopter contact RescueHelicopter......");
+	} else 	if( !hMove && mHFFConn){
+		System.err.println("OffloadHelicopter contact RescueHelicopter ......");
 		hOrder.value = true;
 		mHMoveByOrder.value = true;
+	}else if( !hMove && !mHFFConn){
+		System.err.println("OffloadHelicopter order RescueHelicopter to move ......");
+		hOrder.value = false;
+		mHMoveByOrder.value = true;
+		mHFFPos.value = hFFPos;
+		mHFFSpeed.value = hFFSpeed;
+		mHFFCreationTime.value = hFFCreationTime;
+		
+		hHPos.value = mHPos;
+		hHSpeed.value = mHSpeed;
+		hHCreationTime.value = mHCreationTime;
 	}
-	mHFFPos.value = hFFPos;
-	mHFFSpeed.value = hFFSpeed;
-	mHFFCreationTime.value = hFFCreationTime;
-	hHPos.value = mHPos;
-	hHSpeed.value = mHSpeed;
 	
 	}
 }

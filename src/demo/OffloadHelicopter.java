@@ -1,6 +1,5 @@
 package demo;
 
-import javafx.geometry.HPos;
 
 import org.apache.commons.math3.analysis.differentiation.DerivativeStructure;
 import org.apache.commons.math3.exception.DimensionMismatchException;
@@ -9,7 +8,6 @@ import org.apache.commons.math3.ode.FirstOrderDifferentialEquations;
 import org.apache.commons.math3.ode.FirstOrderIntegrator;
 import org.apache.commons.math3.ode.nonstiff.MidpointIntegrator;
 
-import com.ibm.jsse2.v;
 
 import cz.cuni.mff.d3s.deeco.annotations.In;
 import cz.cuni.mff.d3s.deeco.annotations.InOut;
@@ -26,19 +24,22 @@ public class OffloadHelicopter extends Component {
 	public Double hSpeed = 0.0;
 	public Double hGas = 0.0;
 	public Double hBrake = 0.0;
-	public Double hRangeDistance = 100.0; // sensors or camera range  
-
 	public Boolean hMove = false;
 	public Boolean hOrder = false;
+	public Double hRangeDistance = 100.0; 
+
 	
 	public Double hFFPos = 0.0;
 	public Double hFFSpeed = 0.0;
 	public Double hFFCreationTime = 0.0;
 	public Boolean hFFConnected = false;
+	public Boolean hFFLost = false;
 	
 	public Double hHPos = 0.0;
 	public Double hHSpeed = 0.0;
+	public Boolean hHConnected = false;
 	public Double hHCreationTime = 0.0;
+	
 
 	public Double hFFTargetPos = 0.0;
 	public Double hFFTargetSpeed = 0.0;
@@ -46,18 +47,20 @@ public class OffloadHelicopter extends Component {
 	public Double hHTargetPos = 0.0;
 	public Double hHTargetSpeed = 0.0;
 
-	protected static double hLastTime = 0.0;
 	protected static double hFFPosMin = 0.0;
 	protected static double hFFSpeedMin = 0.0;
 	protected static double hFFPosMax = 0.0;
 	protected static double hFFSpeedMax = 0.0;
 
 	protected static double hHLastTime = 0.0;
+	protected static double hHInit = 0.0;
 	protected static double hHPosMin = 0.0;
 	protected static double hHSpeedMin = 0.0;
 	protected static double hHPosMax = 0.0;
 	protected static double hHSpeedMax = 0.0;
 
+	protected static double hInit = 0.0;
+	protected static double hLastTime = 0.0;
 	protected static double hIntegratorError = 0.0;
 	protected static double hErrorWindup = 0.0;
 
@@ -69,7 +72,7 @@ public class OffloadHelicopter extends Component {
 	protected static final double TIMEPERIOD = 100;
 	protected static final double SEC_MILISEC_FACTOR = 1000;
 	protected static final double DESIRED_DISTANCE = 0;
-	protected static final double DESIRED_SPEED = 0;
+	protected static final double DESIRED_SPEED = 10;
 	protected static final double SPEED_UPPER_LIMIT = 200;
 	protected static final double THRESHOLD = 200;
 
@@ -87,6 +90,7 @@ public class OffloadHelicopter extends Component {
 
 			@In("hHPos") Double hHPos, 
 			@In("hHSpeed") Double hHSpeed,
+			@In("hHConnected") Boolean hHConnected,
 			@In("hHCreationTime") Double hHCreationTime,
 
 			@Out("hGas") OutWrapper<Double> hGas,
@@ -98,66 +102,81 @@ public class OffloadHelicopter extends Component {
 			@InOut("hFFPos") OutWrapper<Double> hFFPos, 
 			@InOut("hFFSpeed") OutWrapper<Double> hFFSpeed,
 			@InOut("hFFCreationTime") OutWrapper<Double> hFFCreationTime,
+			@InOut("hFFLost") OutWrapper<Boolean> hFFLost,
 			@InOut("hFFConnected") OutWrapper<Boolean> hFFConnected,
 			@InOut("hFFTargetPos") OutWrapper<Double> hFFTargetPos,
 			@InOut("hFFTargetSpeed") OutWrapper<Double> hFFTargetSpeed
  			) {
 	
-		System.out.println(" - OffloadHelicopter : pos "+hPos+", speed "+hSpeed+"...In the OffloadHelicopter : - firefighter : pos "+hFFPos.value+" ,  speed "+hFFSpeed.value+" , creation time "+hFFCreationTime.value);
-
+		System.out.println(" - OffloadHelicopter : pos "+hPos+", speed "+hSpeed+".."+hFFTargetSpeed.value+".In the OffloadHelicopter : - firefighter : pos "+hFFPos.value+" ,  speed "+hFFSpeed.value+" , creation time "+hFFCreationTime.value);
 		if(hFFCreationTime.value != 0.0){
 			double inaccuracy = -1;
-			computeBeliefBoundaries(hFFPos.value, hFFSpeed.value, hFFTargetPos.value, hFFCreationTime.value );
+			computeBeliefBoundaries(hFFPos.value, hFFSpeed.value, hFFTargetPos.value, hFFCreationTime.value);
 		
 			if (hFFTargetPos.value != 0.0)
 				inaccuracy = Math.max( Math.abs(hFFPos.value  - hFFPosMin), Math.abs(hFFPosMax - hFFPos.value)); 
 			
-			if (inaccuracy <= THRESHOLD) {
- 				hFFTargetPos.value = hPos;
-				hFFTargetSpeed.value = hSpeed;
-				
-			} else if(inaccuracy > THRESHOLD) {
+			if (inaccuracy <= THRESHOLD ) {
+				hFFLost.value = false;
+			} else 
+			if(inaccuracy > THRESHOLD) {
 				hFFConnected.value = false;
+				hFFLost.value = true;
 			}
-	
-			if(!hFFConnected.value){
+
+			if(!hFFConnected.value && inaccuracy >= 0 && hHConnected){
 				if(hHPos != 0.0)
 					computeBeliefBoundariesHelicopter(hHPos, hHSpeed, hHPos, hHCreationTime);
-				double hHInaccuracy = -1;
-				hHInaccuracy = Math.max( Math.abs(hHPos - hHPosMin), Math.abs(hHPosMax - hHPos)); // do we care if it is so old?????
 				hMove.value = hasToMove(hPos,hHPos,hRangeDistance);
-	
-				if( hOrder.value && hMove.value){
-					System.out.println("%%%%%%%%%%     Order RescureHelicopter to move   %%%%%%%%%%%%");
-					hFFTargetPos.value = hPos;
-					hFFTargetSpeed.value = hSpeed;
-				}else if(!hOrder.value && hMove.value){
+				if(hMove.value && hOrder.value){
+					hFFPos.value = 0.0;
+					hFFSpeed.value = 0.0;
+					hFFCreationTime.value = 0.0;
+					clearFF();
+					hFFLost.value = false;
+					hFFTargetPos.value = hPos; 
+					hFFTargetSpeed.value = DESIRED_SPEED;
+					System.err.println("%%%%%%%%%%     RescureHelicopter connected to the FireFighter   %%%%%%%%%%%%");
+				}else if(hMove.value && !hOrder.value){
 					if(hFFPosMin > hPos){
 						hFFTargetPos.value = hFFPosMax;
 						hFFTargetSpeed.value = hFFSpeedMax;
 					}else if(hPos > hFFPosMax){
-						hFFTargetPos.value = hFFPosMin;
-						hFFTargetSpeed.value = hFFSpeedMin;
+						hFFTargetPos.value = hPos  + hRangeDistance;
+						hFFTargetSpeed.value = DESIRED_SPEED;
 					} else {			
 						hFFTargetPos.value = hFFPosMax;			
-						hFFTargetSpeed.value = hFFSpeedMax;		
+						hFFTargetSpeed.value = hFFSpeedMax;	
 					}											
-					System.out.println("Move.....  from : "+hPos+"  to "+hFFTargetPos.value+",   Min pos: "+hFFPosMin+"   Max pos:"+hFFPosMax);
-				} else {
- 					System.out.println("Inside the rang : FireFighter connected to RescueHelicopter");
+					System.err.println("Move.....  from : "+hPos+"  to "+hFFTargetPos.value+",   Min pos: "+hFFPosMin+"  Max pos:"+hFFPosMax);
+				}else if(!hMove.value && hOrder.value){
 					hFFPos.value = 0.0;
 					hFFSpeed.value = 0.0;
 					hFFCreationTime.value = 0.0;
+					clearFF();
+					hFFLost.value = false;
 					hFFTargetPos.value = hPos; 
-					hFFTargetSpeed.value = hSpeed;
+					hFFTargetSpeed.value = DESIRED_SPEED;
+					System.err.println("%%%%%%%%%%     RescureHelicopter connected to the FireFighter   %%%%%%%%%%%%");
+				}else if(!hMove.value && !hOrder.value){
+					hFFPos.value = 0.0;
+					hFFSpeed.value = 0.0;
+					hFFCreationTime.value = 0.0;
+					clearFF();
+					hFFLost.value = false;
+					hFFTargetPos.value = hPos; 
+					hFFTargetSpeed.value = DESIRED_SPEED;
+					System.err.println("OffloadHelicopter order RescueHelicopter to move ......");
 				}
+			}else{
+				hFFTargetPos.value = hPos; 
+				hFFTargetSpeed.value = DESIRED_SPEED;
 			}
-		} else {
-			
-			hFFTargetPos.value = hPos;
-			hFFTargetSpeed.value = hSpeed;
+		}else{
+			hFFTargetPos.value = hPos; 
+			hFFTargetSpeed.value = DESIRED_SPEED;
 		}
-		
+
 		Pedal p = speedControl(hPos, hSpeed, hFFTargetPos.value, hFFTargetSpeed.value);
 		hGas.value = p.gas;
 		hBrake.value = p.brake;
@@ -178,7 +197,7 @@ public class OffloadHelicopter extends Component {
 					* timePeriodInSeconds;
 			double pidSpeed = KP_S * error + hIntegratorError;
 			hErrorWindup = saturate(pidSpeed) - pidSpeed;
-
+			
 			if (pidSpeed >= 0) {
 				result = new Pedal(pidSpeed, 0.0);
 			} else {
@@ -190,24 +209,32 @@ public class OffloadHelicopter extends Component {
 	}
 
 
-	private static void computeBeliefBoundaries( Double hFFPos, Double hFFSpeed, Double hfFFTargetPos, Double hFFCreationTime ) {
+	private static void computeBeliefBoundaries( Double hFFPos, Double hFFSpeed, Double hFFTargetPos, Double hFFCreationTime ) {
 
 		double currentTime = System.nanoTime() / SEC_NANOSEC_FACTOR;
 		double[] minBoundaries = new double[1];
 		double[] maxBoundaries = new double[1];
 		double startTime = 0.0;
-
-		if(hfFFTargetPos != 0.0 ) {
-			if (hFFCreationTime <= hLastTime) {
-				startTime = hLastTime;
-			} else {
+		
+		if(hFFTargetPos != 0.0 ) {
+			if(hFFCreationTime > hInit){
 				startTime = hFFCreationTime;
 				hFFPosMin = hFFPos;
 				hFFPosMax = hFFPos;
 				hFFSpeedMin = hFFSpeed;
 				hFFSpeedMax = hFFSpeed;
+			}else {
+				if (hFFCreationTime <= hLastTime) {
+					startTime = hLastTime;
+				} else if(hFFCreationTime > hLastTime){
+					startTime = hFFCreationTime;
+					hFFPosMin = hFFPos;
+					hFFPosMax = hFFPos;
+					hFFSpeedMin = hFFSpeed;
+					hFFSpeedMax = hFFSpeed;
+				}
 			}
-
+			
 			// ---------------------- knowledge evaluation --------------------------------
 
 			double accMin = Database.getAcceleration(hFFSpeedMin,
@@ -236,60 +263,75 @@ public class OffloadHelicopter extends Component {
 			hFFPosMax += maxBoundaries[0];
 
 		}
+		if(hFFSpeedMax > 200 ) hFFSpeedMax = 200.0;
+		if(hFFSpeedMin < 0.0) hFFSpeedMin = 0.0;
+		if(hFFPosMin < 0.0) hFFPosMin = 0.0;
 		hLastTime = currentTime;
+		hInit = hFFCreationTime;
 	}
 
 
 
-	private static void computeBeliefBoundariesHelicopter( Double fHPos, Double fHSpeed, Double fHTargetPos, Double fHCreationTime ) {
+	private static void computeBeliefBoundariesHelicopter( Double hHPos, Double hHSpeed, Double hHTargetPos, Double hHCreationTime ) {
 
-		double currentTime = System.nanoTime() / SEC_NANOSEC_FACTOR;
-		double[] minBoundaries = new double[1];
-		double[] maxBoundaries = new double[1];
-		double startTime = 0.0;
+			double currentTime = System.nanoTime() / SEC_NANOSEC_FACTOR;
+			double[] minBoundaries = new double[1];
+			double[] maxBoundaries = new double[1];
+			double startTime = 0.0;
+			
+			if(hHTargetPos != 0.0 ) {
+				if(hHCreationTime > hHInit){
+					startTime = hHCreationTime;
+					hHPosMin = hHPos;
+					hHPosMax = hHPos;
+					hHSpeedMin = hHSpeed;
+					hHSpeedMax = hHSpeed;
+				}else {
+					if (hHCreationTime <= hHLastTime) {
+						startTime = hHLastTime;
+					} else if(hHCreationTime > hHLastTime){
+						startTime = hHCreationTime;
+						hHPosMin = hHPos;
+						hHPosMax = hHPos;
+						hHSpeedMin = hHSpeed;
+						hHSpeedMax = hHSpeed;
+					}
+				}
+				
+				// ---------------------- knowledge evaluation --------------------------------
+				double accMin = Database.getAcceleration(hHSpeedMin,
+						hHPosMin, Database.lTorques, 0.0, 1.0,
+						Database.lMass);
+				double accMax = Database.getAcceleration(hHSpeedMax,
+						hHPosMax, Database.lTorques, 1.0, 0.0,
+						Database.lMass);
 
-		if(fHTargetPos != 0.0 ) {
+				FirstOrderIntegrator integrator = new MidpointIntegrator(1);
+				integrator.setMaxEvaluations((int) TIMEPERIOD);
+				FirstOrderDifferentialEquations f = new Derivation(); 
+				// ------------- min ----------------------
 
-			if (fHCreationTime <= hLastTime) {
-				startTime = hLastTime;
-			} else {
-				startTime = fHCreationTime;
-				hHPosMin = fHPos;
-				hHPosMax = fHPos;
-				hHSpeedMin = fHSpeed;
-				hHSpeedMax = fHSpeed;
+				minBoundaries[0] = accMin;
+				integrator.integrate(f, startTime, minBoundaries, currentTime, minBoundaries);
+				hHSpeedMin += minBoundaries[0];
+				integrator.integrate(f, startTime, minBoundaries, currentTime, minBoundaries);
+				hHPosMin += minBoundaries[0];
+				// ------------- max ----------------------
+
+				maxBoundaries[0] = accMax;
+				integrator.integrate(f, startTime, maxBoundaries, currentTime, maxBoundaries);
+				hHSpeedMax += maxBoundaries[0];
+				integrator.integrate(f, startTime, maxBoundaries, currentTime, maxBoundaries);
+				hHPosMax += maxBoundaries[0];
+
 			}
-
-			// ---------------------- knowledge evaluation --------------------------------
-
-			double accMin = Database.getAcceleration(hHSpeedMin,
-					hHPosMin, Database.lTorques, 0.0, 1.0,
-					Database.lMass);
-			double accMax = Database.getAcceleration(hHSpeedMax,
-					hHPosMax, Database.lTorques, 1.0, 0.0,
-					Database.lMass);
-
-			FirstOrderIntegrator integrator = new MidpointIntegrator(1);
-			integrator.setMaxEvaluations((int) TIMEPERIOD);
-			FirstOrderDifferentialEquations f = new Derivation(); 
-			// ------------- min ----------------------
-
-			minBoundaries[0] = accMin;
-			integrator.integrate(f, startTime, minBoundaries, currentTime, minBoundaries);
-			hHSpeedMin += minBoundaries[0];
-			integrator.integrate(f, startTime, minBoundaries, currentTime, minBoundaries);
-			hHPosMin += minBoundaries[0];
-			// ------------- max ----------------------
-
-			maxBoundaries[0] = accMax;
-			integrator.integrate(f, startTime, maxBoundaries, currentTime, maxBoundaries);
-			hHSpeedMax += maxBoundaries[0];
-			integrator.integrate(f, startTime, maxBoundaries, currentTime, maxBoundaries);
-			hHPosMax += maxBoundaries[0];
-
+			if(hHSpeedMax > 200 ) hHSpeedMax = 200.0;
+			if(hHSpeedMin < 0.0) hHSpeedMin = 0.0;
+			if(hHPosMin < 0.0) hHPosMin = 0.0;
+			hHLastTime = currentTime;
+			hHInit = hHCreationTime;
 		}
-		hHLastTime = currentTime;
-	}
+
 
 	private static double saturate(double val) {
 		if (val > 1)
@@ -330,26 +372,49 @@ public class OffloadHelicopter extends Component {
 
 	
 	private static Boolean hasToMove(double hPos, double hHPos, double hRangeDistance) {
-		double distH1 =0.0;
+		boolean result = false;
+		double distH1 = 0.0;
 		double distH2 = 0.0;
-		
 		if(hFFPosMin > hPos){
 			distH1 = hFFPosMax - hPos;
 		}else if(hPos > hFFPosMax){
 			distH1 = hPos - hFFPosMin;
-		} else if (hHPosMin > hFFPosMax ){
-			distH2 = hHPosMax - hFFPosMin;
-		}else if(hFFPosMax > hHPosMax){
-			distH2 = hFFPosMax - hHPosMin;
+		}else {
+			distH1 = Math.max(hFFPosMax - hPos, hPos - hFFPosMin);
 		}
 		
-		if((distH1 < distH2)  && hPos != 0.0 && hHPos != 0.0 && Math.abs(hPos - hFFPosMax)< (2* hRangeDistance)){
-				return true;
-		} else if((distH1 > distH2)  && hPos != 0.0 && hHPos != 0.0){
-			return false;
-		} else if(hHPos == 0.0)
-			return true;
-		return false;
+		if (hHPosMin > hFFPosMax ){
+			distH2 = hHPosMax - hFFPosMin;
+		}else if(hFFPosMin > hHPosMax){
+			distH2 = hFFPosMax - hHPosMin;
+		}else{
+			distH2 = Math.max(hHPosMax - hFFPosMin, hFFPosMax - hHPosMin);
+		}
+		
+		if(hHPos == 0.0)
+			result = true;
+		else if((distH1 < distH2)  && hPos != 0.0 && hHPos != 0.0 && distH1 < 2*hRangeDistance ){
+				result = true;
+		} else if((distH1 > distH2)  && hPos != 0.0 && hHPos != 0.0 && distH2 < 2*hRangeDistance ){
+			result = false;
+		} else if((distH1 < distH2)  && hPos != 0.0 && hHPos != 0.0){
+			result = true;
+		} else result = false;
+		
+		return result;
 	}
 	
+	private static void clearFF(){
+		hFFPosMin = 0.0;
+		hFFPosMax = 0.0;
+		hFFSpeedMin = 0.0;
+		hFFSpeedMax = 0.0;
+	}
+	
+	private static void clearH(){
+		hHPosMin = 0.0;
+		hHPosMax = 0.0;
+		hHSpeedMin = 0.0;
+		hHSpeedMax = 0.0;
+	}
 }

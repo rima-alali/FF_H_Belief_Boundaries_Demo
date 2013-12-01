@@ -18,7 +18,7 @@ public class FireFighter extends Component {
 	public Double ffBrake = 0.0;
 	public Double ffCreationTime = 0.0;
 	public Double ffLastCommunication = 0.0;
-
+ 
 	public Double ffIntegratorSpeedError = 0.0;
 	public Double ffErrorWindup = 0.0;
 

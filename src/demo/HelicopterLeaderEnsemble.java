@@ -1,6 +1,5 @@
 package demo;
 
-import cz.cuni.mff.d3s.deeco.annotations.InOut;
 import cz.cuni.mff.d3s.deeco.annotations.KnowledgeExchange;
 import cz.cuni.mff.d3s.deeco.annotations.Membership;
 import cz.cuni.mff.d3s.deeco.annotations.In;
@@ -26,7 +25,11 @@ public class HelicopterLeaderEnsemble extends Ensemble {
 			@In("member.lFFSpeed") Double lFFSpeed,
 			@In("member.lFFCreationTime") Double lFFCreationTime
 		){
-		if( (hFFCreationTime - lFFCreationTime)> 0)
+		
+		double hCreation= hFFCreationTime == null ? 0.0 : hFFCreationTime;
+		double lCreation = lFFCreationTime == null ? 0.0 : lFFCreationTime;
+		
+		if((hCreation - lCreation)> 0)
 			return true;
 		return false;
 	}
@@ -48,7 +51,5 @@ public class HelicopterLeaderEnsemble extends Ensemble {
 			lFFSpeed.value = hFFSpeed;
 			lFFCreationTime.value = hFFCreationTime;
  			System.err.println("____________________________ save firefighter statue in the leader through helicopter ________________________");
-	}
-
-	
+	}	
 }

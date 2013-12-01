@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.math3.analysis.UnivariateFunction;
 import org.apache.commons.math3.analysis.interpolation.LinearInterpolator;
-import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.interpolation.UnivariateInterpolator;
 
 public class Database {
@@ -21,7 +20,7 @@ public class Database {
 	protected static final double g = 9.80665;
 
 	static{
-		
+		positionSeries.add(-10000.0);
 		positionSeries.add(0.0);
 		positionSeries.add(1000.0);
 		positionSeries.add(2000.0);
@@ -35,12 +34,12 @@ public class Database {
 		positionSeries.add(10000.0);
 		positionSeries.add(100000.0);
 
-		
+		driverSpeed.add(0.0);
 		driverSpeed.add(90.0);
 		driverSpeed.add(90.0);
 		driverSpeed.add(90.0);
-		driverSpeed.add(150.0);
-		driverSpeed.add(170.0);
+		driverSpeed.add(/*150*/90.0);
+		driverSpeed.add(/*170*/90.0);
 		driverSpeed.add(90.0);
 		driverSpeed.add(90.0);
 		driverSpeed.add(90.0);
@@ -51,19 +50,20 @@ public class Database {
 
 		routeSlops.add(0.0);
 		routeSlops.add(0.0);
-		routeSlops.add(Math.PI/60);
-		routeSlops.add(Math.PI/30);
-		routeSlops.add(Math.PI/20);
-		routeSlops.add(Math.PI/15);
+		routeSlops.add(0.0);
+		routeSlops.add(/*Math.PI/60*/0.0);
+		routeSlops.add(/*Math.PI/30*/0.0);
+		routeSlops.add(/*Math.PI/20*/0.0);
+		routeSlops.add(/*Math.PI/15*/0.0);
 		routeSlops.add(0.0);
 		routeSlops.add(0.0);
-		routeSlops.add(-Math.PI/18);
-		routeSlops.add(-Math.PI/36);
+		routeSlops.add(/*-Math.PI/18*/0.0);
+		routeSlops.add(/*-Math.PI/36*/0.0);
 		routeSlops.add(0.0);
 		routeSlops.add(0.0);
 
 		
-		
+		speedSeries.add(-100000.0);
 		speedSeries.add(0.0);
 		speedSeries.add(8.0);
 		speedSeries.add(20.0);
@@ -79,7 +79,7 @@ public class Database {
 		speedSeries.add(200.0);
 		speedSeries.add(100000.0);
 
-		
+		lTorques.add(0.0);
 		lTorques.add(165.0);
 		lTorques.add(180.0);
 		lTorques.add(180.0);
@@ -105,6 +105,7 @@ public class Database {
 		double FHill = Math.sin(getValue(positionSeries, routeSlops, pos)) * g * mass;
 		double FFinal = FEng - FResistance - FEngResistance - FHill;
 		double Acceleration = FFinal / mass;
+		if(speed < 0 ) Acceleration = 0.0; 
 		return Acceleration;
 	}
 	
